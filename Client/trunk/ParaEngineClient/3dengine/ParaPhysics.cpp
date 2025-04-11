@@ -63,6 +63,11 @@ IParaPhysicsActor* ParaEngine::CParaPhysicsImp::RaycastClosestShape(const PARAVE
 	return NULL;
 }
 
+bool ParaEngine::CParaPhysicsImp::ContactTest(IParaPhysicsActor* actor)
+{
+	return false;
+}
+
 void ParaEngine::CParaPhysicsImp::SetDebugDrawer(IParaDebugDraw* debugDrawer)
 {
 	m_pDebugDrawer = debugDrawer;

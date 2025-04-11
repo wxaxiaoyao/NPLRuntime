@@ -398,7 +398,7 @@ void CPhysicsWorld::StepSimulation(double dTime)
 				obj->GetAABB(&aabb); // 已经包含中心点
 				LoadPhysicsBlock(&aabb, s_block_frame_id);
 
-				if (actor->IsStaticOrKinematicObject()) 
+				if (actor->IsStaticOrKinematicObject() || obj->IsKinematic()) 
 				{
 					// 属性设置为 CollisionFlags=2, ActivationState=4 可右玩家控制位置同步至物理世界 
 					auto pAsset = obj->GetPrimaryAsset();
@@ -412,6 +412,7 @@ void CPhysicsWorld::StepSimulation(double dTime)
 					Quaternion quat;
 					ParaMatrixDecompose(&vScale, &quat, &vTrans, &matrix);
 					quat.ToRotationMatrix(matrix, vPos);
+
 					actor->SetWorldTransform((PARAMATRIX*)&matrix);
 				}
 			}
@@ -428,7 +429,22 @@ void CPhysicsWorld::StepSimulation(double dTime)
 		{
 			IParaPhysicsActor* actor = *itCurCP;
 			CBaseObject* obj = (CBaseObject*)(actor->GetUserData());
-			if (!actor->IsStaticOrKinematicObject()) 
+			auto is_update_obj = !actor->IsStaticOrKinematicObject();
+
+			if (obj->IsKinematic()) 
+			{
+				actor->SetCollisionFlags(actor->GetCollisionFlags() ^ 2);
+				if (m_pPhysicsWorld->ContactTest(actor))
+				{
+					is_update_obj = true;
+				}
+				else
+				{
+					is_update_obj = false;
+				}
+			}
+
+			if (is_update_obj) 
 			{
 				actor->GetWorldTransform((PARAMATRIX*)&matrix);
 				Vector3 pos = matrix.getTrans();
@@ -438,17 +454,21 @@ void CPhysicsWorld::StepSimulation(double dTime)
 				matrix.setTrans(Vector3(0, 0, 0));
 				obj->SetPosition(DVector3(pos.x, pos.y - fCenterHeight, pos.z));
 
-				Matrix4 matOffset;
-				fCenterHeight = fCenterHeight / obj->GetScaling();
-				matOffset.makeTrans(Vector3(0, -fCenterHeight, 0));
-				matOffset = matOffset * matrix;
-				matOffset.offsetTrans(Vector3(0, fCenterHeight, 0));
-
-				obj->SetLocalTransform(matOffset);
-				obj->SetYaw(0);
-				obj->SetRoll(0);
-				obj->SetPitch(0);
+				if (!obj->IsKinematic())
+				{
+					Matrix4 matOffset;
+					fCenterHeight = fCenterHeight / obj->GetScaling();
+					matOffset.makeTrans(Vector3(0, -fCenterHeight, 0));
+					matOffset = matOffset * matrix;
+					matOffset.offsetTrans(Vector3(0, fCenterHeight, 0));
+	
+					obj->SetLocalTransform(matOffset);
+					obj->SetYaw(0);
+					obj->SetRoll(0);
+					obj->SetPitch(0);
+				}
 			}
+
 		}
 
 		// 移除无效方块
@@ -479,12 +499,21 @@ IParaPhysicsActor* ParaEngine::CPhysicsWorld::CreateDynamicMesh(CBaseObject* obj
 		CParaXModel* pModel = ((ParaXEntity*)pAsset)->GetModel();
 		if (pModel != 0)
 		{
-			float fScale = obj->GetScaling();
-			Vector3 vMin = pModel->GetHeader().minExtent;
-			Vector3 vMax = pModel->GetHeader().maxExtent;
-			desc.m_halfWidth = max(abs(vMax.x), abs(vMin.x)) * fScale;
-			desc.m_halfHeight = vMax.y * 0.5f * fScale;
-			desc.m_halfLength = max(abs(vMax.z), abs(vMin.z)) * fScale;
+			if (obj->IsKinematic()) 
+			{
+				desc.m_halfWidth = obj->GetWidth() * 0.5f;
+				desc.m_halfHeight = obj->GetHeight() * 0.5f;
+				desc.m_halfLength = obj->GetDepth() * 0.5f;
+			}
+			else
+			{
+				float fScale = obj->GetScaling();
+				Vector3 vMin = pModel->GetHeader().minExtent;
+				Vector3 vMax = pModel->GetHeader().maxExtent;
+				desc.m_halfWidth = max(abs(vMax.x), abs(vMin.x)) * fScale;
+				desc.m_halfHeight = vMax.y * 0.5f * fScale;
+				desc.m_halfLength = max(abs(vMax.z), abs(vMin.z)) * fScale;
+			}
 			bHasModel = true;
 		}
 	}
@@ -496,9 +525,10 @@ IParaPhysicsActor* ParaEngine::CPhysicsWorld::CreateDynamicMesh(CBaseObject* obj
 		return NULL;
 
 	ParaPhysicsActorDesc ActorDesc;
-	ActorDesc.m_group = obj->GetPhysicsGroup();
-	ActorDesc.m_mask = -1;
+	ActorDesc.m_group = obj->IsKinematic() ? IParaPhysicsGroup::KINEMATIC : obj->GetPhysicsGroup();
+	ActorDesc.m_mask =  obj->IsKinematic() ? (-1 ^ (1 << ActorDesc.m_group)) : -1;
 	ActorDesc.m_mass = 1.0f;
+	// ActorDesc.m_mass = obj->IsKinematic() ? 50.f : 1.0f;  // 设置太大被推不动
 	ActorDesc.m_pShape = pShape;
 
 	// set world position

@@ -12,6 +12,28 @@
 
 using namespace ParaEngine;
 
+class KinematicContactCallback : public btCollisionWorld::ContactResultCallback {
+public:
+	bool hasCollision = false;
+	btCollisionObject* checkObject;
+
+	virtual btScalar addSingleResult(btManifoldPoint& cp,
+									const btCollisionObjectWrapper* colObj0,
+									int partId0,
+									int index0,
+									const btCollisionObjectWrapper* colObj1,
+									int partId1,
+									int index1) {
+		auto obj0 = colObj0->getCollisionObject();
+		auto obj1 = colObj1->getCollisionObject();
+		auto obj = obj0 == checkObject ? obj1 : obj0;
+		hasCollision = hasCollision || cp.getDistance() <= 0;
+		// hasCollision = hasCollision || (obj->isKinematicObject() && cp.getDistance() <= 0);
+		// 返回冲击值
+		return cp.getDistance();
+	}
+};
+
 BulletPhysicsShape::BulletPhysicsShape()
 	:m_pShape(NULL), m_indexVertexArrays(NULL), m_triangleIndices(NULL), m_vertices(NULL)
 {
@@ -66,7 +88,14 @@ void ParaEngine::BulletPhysicsActor::SetWorldTransform(const PARAMATRIX* pMatrix
 	static btTransform transform;
 	transform.setFromOpenGLMatrix((float*)pMatrix);
 	m_pActor->getMotionState()->setWorldTransform(transform);
-	if (IsKinematicObject()) m_pActor->setCenterOfMassTransform(transform);
+	if (IsStaticOrKinematicObject()) 
+	{
+		m_pActor->setWorldTransform(transform); // 强制更新碰撞检测
+	}
+	else
+	{
+		m_pActor->setCenterOfMassTransform(transform);
+	}
 #else
 	m_pActor->getWorldTransform().setFromOpenGLMatrix((float*)pMatrix);
 #endif
@@ -289,6 +318,10 @@ int BulletPhysicsActor::GetCollisionFlags()
 void BulletPhysicsActor::SetCollisionFlags(int flags)
 {
 	m_pActor->setCollisionFlags(flags);
+	if (m_pActor->isKinematicObject()) 
+	{
+		m_pActor->setActivationState(DISABLE_DEACTIVATION);
+	}
 }
 float BulletPhysicsActor::GetCcdSweptSphereRadius()
 {
@@ -307,6 +340,22 @@ void BulletPhysicsActor::SetCcdMotionThreshold(float threshold)
 	m_pActor->setCcdMotionThreshold(threshold);
 }
 
+// 判断动态物体是否静止
+bool BulletPhysicsActor::IsSleeping(float velocityThreshold) 
+{
+    // 1. 检查激活状态（如果物体已休眠，则必定静止）
+	if (m_pActor->isStaticOrKinematicObject()) return false;
+    if (m_pActor->getActivationState() == ISLAND_SLEEPING) return true;
+
+    // 2. 检查线速度和角速度
+    const btVector3& linearVel = m_pActor->getLinearVelocity();
+    const btVector3& angularVel = m_pActor->getAngularVelocity();
+
+    bool isLinearRest = linearVel.length() < velocityThreshold;
+    bool isAngularRest = angularVel.length() < velocityThreshold;
+
+    return (isLinearRest && isAngularRest);
+}
 
 //
 // Physics World
@@ -427,7 +476,9 @@ IParaPhysicsShape* CParaPhysicsWorld::CreateSimpleShape(const ParaPhysicsSimpleS
 	}
 	else if (shapeDesc.m_shape == "capsule")
 	{
-		pShape->m_pShape = new btCapsuleShape(shapeDesc.m_halfWidth, (shapeDesc.m_halfHeight - shapeDesc.m_halfWidth) * 2);
+		auto radius = shapeDesc.m_halfWidth < shapeDesc.m_halfLength ? shapeDesc.m_halfLength : shapeDesc.m_halfWidth;
+		pShape->m_pShape = new btCapsuleShape(radius, (shapeDesc.m_halfHeight - radius) * 2);
+		// pShape->m_pShape = new btCapsuleShape(shapeDesc.m_halfWidth, (shapeDesc.m_halfHeight - shapeDesc.m_halfWidth) * 2);
 	}
 	else 
 	{
@@ -554,6 +605,10 @@ IParaPhysicsActor* CParaPhysicsWorld::CreateActor(const ParaPhysicsActorDesc& ac
 		body->setCollisionFlags(body->getCollisionFlags() | btCollisionObject::CF_STATIC_OBJECT);
 	}
 
+	// 启用连续碰撞检测 (CCD)
+	body->setCcdMotionThreshold(0.1f);   // 移动阈值 大了会穿透物体或跑到物体上方
+	body->setCcdSweptSphereRadius(0.5f); // 检测半径
+
 	// short collisionFilterGroup = isDynamic? short(btBroadphaseProxy::DefaultFilter) : short(btBroadphaseProxy::StaticFilter);
 	// short collisionFilterMask = isDynamic? 	short(btBroadphaseProxy::AllFilter) : 	short(btBroadphaseProxy::AllFilter ^ btBroadphaseProxy::StaticFilter);
 
@@ -561,7 +616,7 @@ IParaPhysicsActor* CParaPhysicsWorld::CreateActor(const ParaPhysicsActorDesc& ac
 	short nGroupMask = 1 << actorDesc.m_group;
 
 	m_dynamicsWorld->addRigidBody(body, nGroupMask, actorDesc.m_mask);
-
+	
 	BulletPhysicsActor* pActor = new BulletPhysicsActor(body);
 
 	body->setUserPointer(pActor);
@@ -607,7 +662,8 @@ IParaPhysicsActor* ParaEngine::CParaPhysicsWorld::RaycastClosestShape(const PARA
 {
 	btVector3 vFrom(vOrigin.x, vOrigin.y, vOrigin.z);
 	btVector3 vTo(vDirection.x, vDirection.y, vDirection.z);
-	dwGroupMask = dwGroupMask ^ (1 << IParaPhysicsGroup::BLOCK);  // 屏蔽地块组
+	dwGroupMask = dwGroupMask ^ (1 << IParaPhysicsGroup::BLOCK);      // 屏蔽地块组
+	dwGroupMask = dwGroupMask ^ (1 << IParaPhysicsGroup::KINEMATIC);  // 屏蔽地块组
 
 	if (fSensorRange < 0.f)
 		fSensorRange = 200.f;
@@ -633,6 +689,16 @@ IParaPhysicsActor* ParaEngine::CParaPhysicsWorld::RaycastClosestShape(const PARA
 		hit.m_vHitNormalWorld = CONVERT_PARAVECTOR3(btVector3(1.0, 0.0, 0.0));
 		return NULL;
 	}
+}
+
+bool ParaEngine::CParaPhysicsWorld::ContactTest(IParaPhysicsActor* actor)
+{
+	KinematicContactCallback cb;
+	cb.checkObject = ((BulletPhysicsActor*)actor)->m_pActor;
+	cb.hasCollision = false;
+	// cb.m_collisionFilterGroup = btBroadphaseProxy::KinematicFilter;
+	m_dynamicsWorld->contactTest((btCollisionObject*)actor->get(), cb);
+	return cb.hasCollision;
 }
 
 void ParaEngine::CParaPhysicsWorld::SetDebugDrawer(IParaDebugDraw* debugDrawer)

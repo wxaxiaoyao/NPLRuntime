@@ -26,6 +26,8 @@ namespace ParaEngine
 		virtual void ReleaseActor(IParaPhysicsActor* pActor);
 
 		virtual IParaPhysicsActor* RaycastClosestShape(const PARAVECTOR3& vOrigin, const PARAVECTOR3& vDirection, DWORD dwType, RayCastHitResult& hit, short dwGroupMask, float fSensorRange);
+		
+		virtual bool ContactTest(IParaPhysicsActor* actor);
 
 		virtual void SetDebugDrawer(IParaDebugDraw* debugDrawer);
 

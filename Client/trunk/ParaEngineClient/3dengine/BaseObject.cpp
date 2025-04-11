@@ -38,6 +38,7 @@ CBaseObject::CBaseObject()
 	:m_tileContainer(NULL), m_nTechniqueHandle(-1), m_objType(_undefined), m_bGeometryDirty(false), m_bEnableLOD(true),
 	m_dwAttribute(0), m_pEffectParamBlock(NULL), m_nFrameNumber(0), m_nID(0), m_nSelectGroupIndex(-1), m_nRenderImportance(0), m_fRenderDistance(0.f), m_fRenderOrder(0.f), m_nMaterialId(-1)
 {
+	SetKinematic(false);
 }
 //-----------------------------------------------------------------------------
 // Name: CBaseObject::~CBaseObject
@@ -1271,6 +1272,7 @@ int CBaseObject::InstallFields(CAttributeClass* pClass, bool bOverride)
 	pClass->AddField("PhysicsShape", FieldType_String, (void*)SetPhysicsShape_s, (void*)GetPhysicsShape_s, NULL, "", bOverride);
 	pClass->AddField("PhysicalProperty", FieldType_String, (void*)SetPhysicsProperty_s, (void*)GetPhysicsProperty_s, NULL, "", bOverride);
 	pClass->AddField("ApplyCentralImpulse", FieldType_Vector3, (void*)ApplyCentralImpulse_s, NULL, NULL, "", bOverride);
+	pClass->AddField("Kinematic", FieldType_Bool, (void*)SetKinematic_s, (void*)IsKinematic_s, NULL, "", bOverride);
 	pClass->AddField("SelectGroupIndex", FieldType_Int, (void*)SetSelectGroupIndex_s, (void*)GetSelectGroupIndex_s, NULL, NULL, bOverride);
 	pClass->AddField("On_AssetLoaded", FieldType_String, (void*)SetOnAssetLoaded_s, (void*)GetOnAssetLoaded_s, NULL, NULL, bOverride);
 	pClass->AddField("ViewTouch", FieldType_Bool, (void*)NULL, (void*)GetViewTouch_s, NULL, "", bOverride);

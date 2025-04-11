@@ -548,6 +548,9 @@ namespace ParaEngine
 		ATTRIBUTE_METHOD1(CBaseObject, SetPhysicsProperty_s, const char*) { cls->SetPhysicsProperty(p1); return S_OK; }
 
 		ATTRIBUTE_METHOD1(CBaseObject, ApplyCentralImpulse_s, Vector3) { cls->ApplyCentralImpulse(p1); return S_OK; }
+		
+		ATTRIBUTE_METHOD1(CBaseObject, IsKinematic_s, bool*)		{ *p1 = cls->IsKinematic(); return S_OK; }
+		ATTRIBUTE_METHOD1(CBaseObject, SetKinematic_s, bool)		{ cls->SetKinematic(p1); return S_OK; }
 
 		ATTRIBUTE_METHOD1(CBaseObject, IsLODEnabled_s, bool*) { *p1 = cls->IsLODEnabled(); return S_OK; }
 		ATTRIBUTE_METHOD1(CBaseObject, EnableLOD_s, bool) { cls->EnableLOD(p1); return S_OK; }
@@ -749,7 +752,9 @@ namespace ParaEngine
 		virtual bool IsDynamicPhysicsEnabled() { return false; }
 		// 设置物理速度
 		virtual void ApplyCentralImpulse(const Vector3& impulse) {}
-
+		// 是否是运动学物理
+		bool IsKinematic() { return m_kinematic; }
+		void SetKinematic(bool kinematic) { m_kinematic = kinematic; }
 		/** this function is called, when the object is in view range. we may need to load the primary asset to update the bounding box, etc.
 		* @return true if the object is ready to be rendered.
 		*/
@@ -1349,6 +1354,9 @@ namespace ParaEngine
 		bool m_bGeometryDirty : 1;
 		/** whether to enable lod if there is lod. Default to true. */
 		bool m_bEnableLOD : 1;
+	
+		bool m_kinematic;
+
 		/** enum of RenderSelectionStyle */
 		static int g_nObjectSelectionEffect;
 	};

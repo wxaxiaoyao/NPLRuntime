@@ -71,9 +71,11 @@ namespace ParaEngine
 	enum IParaPhysicsGroup
 	{
 		// 默认, 动态物理组
-		DEFAULT = 0,  // 1 << 0
+		DEFAULT = 1,  // 1 << 0
 		// 静态物理组
-		STATIC = 1,
+		STATIC = 2,
+		// 运动学
+		KINEMATIC = 14,
 		// 地块组
 		BLOCK = 15,
 	};
@@ -133,6 +135,7 @@ namespace ParaEngine
 		virtual bool IsStaticObject() = 0;
 		virtual bool IsKinematicObject() = 0;
 		virtual bool IsStaticOrKinematicObject() = 0;
+		virtual bool IsSleeping(float velocityThreshold = 0.1f) = 0;
 
 		virtual float GetMass() = 0;
 		virtual void SetMass(float mass) = 0;
@@ -182,6 +185,7 @@ namespace ParaEngine
 		virtual void SetCcdSweptSphereRadius(float radius) = 0;
 		virtual float GetCcdMotionThreshold() = 0;
 		virtual void SetCcdMotionThreshold(float threshold) = 0;
+		
 		void* m_pUserData;
 	};
 
@@ -231,6 +235,8 @@ namespace ParaEngine
 
 		/** ray cast a given group. */
 		virtual IParaPhysicsActor* RaycastClosestShape(const PARAVECTOR3& vOrigin, const PARAVECTOR3& vDirection, DWORD dwType, RayCastHitResult& hit, short dwGroupMask, float fSensorRange) = 0;
+		
+		virtual bool ContactTest(IParaPhysicsActor* actor) = 0;
 
 		/** set the debug draw object for debugging physics world. */
 		virtual void	SetDebugDrawer(IParaDebugDraw*	debugDrawer) = 0;

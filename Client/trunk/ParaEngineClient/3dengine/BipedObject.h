@@ -215,7 +215,7 @@ namespace ParaEngine
 
 		ATTRIBUTE_METHOD1(CBipedObject, IsControlledExternally_s, bool*)		{ *p1 = cls->IsControlledExternally(); return S_OK; }
 		ATTRIBUTE_METHOD1(CBipedObject, SetIsControlledExternally_s, bool)		{ cls->SetIsControlledExternally(p1); return S_OK; }
-
+		
 	protected:
 		/** Move the biped in the physical scene.move the biped towards the target using its current speed and facing
 		* the biped may slide along a wall or be stopped.
@@ -864,6 +864,7 @@ namespace ParaEngine
 		/** get the number of physics actors. If physics is not loaded, the returned value is 0. */
 		int GetStaticActorCount();
 		void EnableAutoAnimation(bool enable);
+
 	protected:
 		void AnimateIdle(double dTimeDelta);
 		void AnimateMoving(double dTimeDelta, bool bSharpTurning = false);

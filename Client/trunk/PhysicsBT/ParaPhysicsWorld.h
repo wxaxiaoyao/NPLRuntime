@@ -67,6 +67,8 @@ namespace ParaEngine
 		virtual bool IsStaticObject();
 		virtual bool IsKinematicObject();
 		virtual bool IsStaticOrKinematicObject();
+		virtual bool IsSleeping(float velocityThreshold = 0.1f);
+		
 		virtual float GetMass();
 		virtual void SetMass(float mass);
 		virtual PARAVECTOR3 GetLocalInertia();
@@ -161,7 +163,9 @@ namespace ParaEngine
 
 		/** ray cast a given group. */
 		virtual IParaPhysicsActor* RaycastClosestShape(const PARAVECTOR3& vOrigin, const PARAVECTOR3& vDirection, DWORD dwType, RayCastHitResult& hit, short dwGroupMask, float fSensorRange);
-
+		
+		virtual bool ContactTest(IParaPhysicsActor* actor);
+		
 		/** set the debug draw object for debugging physics world. */
 		virtual void	SetDebugDrawer(IParaDebugDraw*	debugDrawer);
 

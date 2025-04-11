@@ -1699,7 +1699,7 @@ public:
 	* @param fAngleCoef: Default value is 0.16f. asin(sqrt(0.16)) = 23 degrees. I arbitrarily define any adjacent two walls
 	* with over 23 degrees difference to be a corner. If you want to define a different wall angle, then
 	* supply your own fAngleCoef = sin(angle)*sin(angle), where angle is your desired wall angle.*/
-	void ComputeSensorGroup(const Vector3& vOrig, const Vector3& vDir, float fSensorRange, DWORD dwGroupMask = DEFAULT_PHYSICS_GROUP_MASK, int nSensorRayCount = BIPED_SENSOR_RAY_NUM, float fAngleCoef = 0.16f)
+	void ComputeSensorGroup(const Vector3& vOrig, const Vector3& vDir, float fSensorRange, DWORD dwGroupMask = DEFAULT_PHYSICS_GROUP_MASK, int nSensorRayCount = BIPED_SENSOR_RAY_NUM, float fAngleCoef = 0.16f, bool isKinematic = false)
 	{
 		if (nSensorRayCount>BIPED_SENSOR_RAY_NUM || BIPED_SENSOR_RAY_NUM <= 0)
 			return;
@@ -1772,6 +1772,15 @@ public:
 			IParaPhysicsActor* closestShape = CGlobals::GetPhysicsWorld()->GetPhysicsInterface()->RaycastClosestShape(
 				CONVERT_PARAVECTOR3(m_vOrig), CONVERT_PARAVECTOR3(sensor.vDir), 0, hit, (int16)dwGroupMask, m_fSensorRange);
 			//OUTPUT_LOG(" end\n");
+			
+			if (isKinematic && closestShape != nullptr)
+			{
+				if (closestShape->IsSleeping())
+				{
+					closestShape = nullptr;
+				}				
+			}
+
 			if (closestShape && m_fSensorRange >= hit.m_fDistance)
 			{
 				nHitCount++;
@@ -2298,7 +2307,7 @@ bool CBipedObject::MoveTowards(double dTimeDelta, const DVector3& vPosTarget, fl
 			float fSensorHeight = GetPhysicsHeight()*SENSOR_HEIGHT_RATIO;
 			orig.y += fSensorHeight;
 			// compute sensor group 0. 
-			g_sensorGroups[0].ComputeSensorGroup(orig, vBipedFacing, fRadius, GetPhysicsGroupMask());
+			g_sensorGroups[0].ComputeSensorGroup(orig, vBipedFacing, fRadius, GetPhysicsGroupMask(), BIPED_SENSOR_RAY_NUM, 0.16f, m_kinematic);
 		}
 
 		bool bCanMove = false; // whether the character can move either directly or sliding along wall.
@@ -2863,7 +2872,6 @@ bool CBipedObject::MoveTowards(double dTimeDelta, const DVector3& vPosTarget, fl
 		}
 		//Math::SmoothMoveVec3(&m_vNorm, vNorm, m_vNorm, (float)(0.2f*GetAbsoluteSpeed()*dTimeDelta), 0);
 		//Math::SmoothMoveVec3(&m_vNorm, vNorm, m_vNorm, (float)(SPEED_NORM_TURN*dTimeDelta), 0);
-
 	}
 
 	if (pIsSlidingWall)
@@ -2882,6 +2890,10 @@ bool CBipedObject::MoveTowards(double dTimeDelta, const DVector3& vPosTarget, fl
 	{
 		bReachPos = false;
 	}
+
+	// 此行可以避免人物反弹
+	// if (IsKinematic()) m_dynamicPhysicsActor->SetCollisionFlags(m_dynamicPhysicsActor->GetCollisionFlags() | 2);
+
 	return bReachPos;
 }
 
@@ -5689,6 +5701,7 @@ int CBipedObject::InstallFields(CAttributeClass* pClass, bool bOverride)
 	pClass->AddField("AutoWalkupBlock", FieldType_Bool, (void*)SetAutoWalkupBlock_s, (void*)IsAutoWalkupBlock_s, NULL, "", bOverride);
 	pClass->AddField("IsControlledExternally", FieldType_Bool, (void*)SetIsControlledExternally_s, (void*)IsControlledExternally_s, NULL, "", bOverride);
 	pClass->AddField("BlendingFactor", FieldType_Float, (void*)SetBlendingFactor_s, NULL, NULL, "", bOverride);
+
 	return S_OK;
 }
 
